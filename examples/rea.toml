@@ -1,0 +1,15 @@
+[worker]
+provider = "groq"
+model = "llama-3.3-70b-versatile"
+api_key_env = "GROQ_API_KEY"
+
+[[mcp_servers]]
+name = "rea"
+command = "npx"
+args = ["-y", "rea-agents@6.7.0", "mcp"]
+# Discover the exact advertised names first; then enable only the tools you need.
+read_tools = []
+write_tools = []
+timeout = 120
+# Prefer a reviewed, locally installed absolute executable for reproducible starts.
+# See docs/ASSISTANT.md for required Node versions, cache behavior, and provider setup.

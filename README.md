@@ -1,18 +1,20 @@
-# Arena Standalone
+# Battle-Answer (Arena Standalone)
 
-Give one task to several LLM workers, let their solutions challenge and improve each other, and select a winner with a configurable judge. This fork replaces the Claude Code plugin with a standalone Python application.
+Use a persistent assistant for everyday work, or give a task to several LLM workers, let their solutions challenge and improve each other, and select a winner with a configurable judge. This fork replaces the Claude Code plugin with a standalone Python application.
+
+Version 0.3 adds a local chat UI, project and conversation retrieval, PDF/DOCX text extraction, an opt-in Chromium browser, and persistent MCP connections for external tools such as API Anything and REA. See [assistant setup](docs/ASSISTANT.md) and [research and integration decisions](docs/INTEGRATIONS.md).
 
 The original strategy dealer, rubric, and elimination bracket are preserved from [Jake Schincariol's Arena](https://github.com/Jakeschincariol/arena-skill). The MIT license and attribution remain intact.
 
 ## Quick start
 
-Requires Python 3.11+. No runtime Python dependencies or Claude Code installation.
+Requires Python 3.11+. The base installation has no runtime dependencies; browser, MCP, and PDF support use optional extras. No Claude Code installation is needed.
 
 ```bash
-git clone https://github.com/HarshPopat23/arena-skill.git
-cd arena-skill
-# Until this PR is merged:
-git switch feat/standalone-api-arena
+git clone https://github.com/HarshPopat23/Battle-Answer.git
+cd Battle-Answer
+# For the v0.3 changes before the PR is merged:
+git switch feat/assistant-tools
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
@@ -20,7 +22,9 @@ cp examples/groq.toml arena.toml
 export GROQ_API_KEY='your-key-here'
 arena plan --config arena.toml
 arena doctor --config arena.toml
-arena run --config arena.toml --task "Design a simple study planner" --dir .arena/planner
+arena serve --config arena.toml --session .arena/my-assistant
+# Open http://127.0.0.1:8765. Or use a tournament directly:
+# arena run --config arena.toml --task "Design a simple study planner" --dir .arena/planner
 ```
 
 On Windows PowerShell, activate with `.venv\Scripts\Activate.ps1` and set `$env:GROQ_API_KEY = 'your-key-here'` instead of `export`. Commands also work as `python -m arena ...` without installation.
@@ -74,9 +78,12 @@ Each competitor receives a separate filtered project copy. Original files are ne
 | `write_file` | Competitor's copy only; disabled for attackers/judges |
 | `run_command` | Requires `--allow-exec`; Docker only, never a host shell |
 | `fetch_url` | Requires exact `arena.web_hosts`; HTTPS text with public IP pinning, no redirects |
+| `read_document`, `context_search`, `history_search` | Document text in the copy; source/line retrieval and conversation memory in assistant sessions |
+| `browser_*` | Optional Playwright extra, configured exact origins and `--allow-browser`; click/fill/press require approval |
+| `mcp_<server>__<tool>` | Optional MCP extra and `--allow-mcp`; explicit tool selection and schema validation; configured write tools require approval |
 | Judge candidate-file tools | Read-only inspection of X/Y workspaces |
 
-Web fetch does not provide browser logins, screenshots, or JavaScript rendering. Arena does not reproduce every Claude Code feature or automatically connect MCP servers.
+`fetch_url` remains a text-only fetch. The optional browser adds JavaScript rendering, DOM interactions, tabs, screenshots, and bounded console/network evidence in a fresh context. Browser redirects are blocked. MCP servers are trusted external programs/services and can operate outside the project copy; their permissions differ from the local file/Docker tools. Read [the full boundaries and setup](docs/ASSISTANT.md) before enabling them. Arena does not reproduce every Claude Code feature.
 
 ### Execute and verify code
 
@@ -138,6 +145,12 @@ python -m compileall -q arena
 python -m arena plan --config examples/groq.toml
 ```
 
-Tests cover the original 100-competitor bracket, local HTTP wire fixtures for the API families, model doubles for tournaments/baseline/resume, real local file tools/patch applicability, and mocked Docker verification. They do not establish hosted-model answer quality or live Docker sandbox acceptance. No real API keys are needed for tests.
+Tests cover the original bracket, API wire fixtures, model doubles for tournaments and multi-turn assistance, file/patch isolation, document retrieval, local UI approvals, real stdio/HTTP MCP fixtures, and Chromium interactions. Optional tests skip when their dependencies/browser are missing; the integration CI job installs all extras and requires them. Docker execution remains mocked. These tests do not establish hosted-model answer quality, live Docker acceptance, or the correctness of third-party MCP applications. No real API keys are needed.
+
+```bash
+python -m pip install -e '.[all]'
+python -m playwright install chromium
+ARENA_REQUIRE_INTEGRATION=1 python -m unittest discover -s tests -v
+```
 
 The low-level bracket CLI remains at `python -m arena.bracket ...`. The standalone runner owns API calls, tools, stricter response validation, checkpoints, and evidence. Claude marketplace packaging and `SKILL.md` orchestration have been removed.

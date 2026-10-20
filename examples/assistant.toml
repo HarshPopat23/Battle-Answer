@@ -1,0 +1,20 @@
+# Choose a model ID available to your account. Keep credentials in the environment.
+[worker]
+provider = "groq"
+model = "llama-3.3-70b-versatile"
+api_key_env = "GROQ_API_KEY"
+
+[arena]
+agents = 4
+concurrency = 2
+max_calls = 200
+max_total_tokens = 500000
+max_tool_steps = 12
+# Text fetch is separate from the browser. Add only the documentation hosts needed.
+web_hosts = []
+
+[browser]
+enabled = true
+origins = ["http://127.0.0.1:3000"]
+headless = true
+# For system Chromium, optionally set executable_path to its absolute executable.
