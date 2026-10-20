@@ -1,0 +1,1 @@
+I explicitly approve filling the form with Name 'TEST-Arena' and Slot '10:00'. I also explicitly approve clicking 'Save booking'. Please proceed with filling the fields and clicking Save booking now. After submission, inspect the actual visible result and network evidence. Save a browser screenshot and explain what evidence supports success.

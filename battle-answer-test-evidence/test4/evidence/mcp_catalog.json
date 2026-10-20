@@ -1,0 +1,56 @@
+﻿{
+  "fixture": {
+    "list_operations": {
+      "description": "No arguments; returns available operations.",
+      "inputSchema": {
+        "properties": {},
+        "title": "list_operationsArguments",
+        "type": "object"
+      }
+    },
+    "lookup_record": {
+      "description": "Lookup record by ID matching ^R-[0-9]{3}$.",
+      "inputSchema": {
+        "properties": {
+          "record_id": {
+            "description": "Record ID matching ^R-[0-9]{3}$",
+            "pattern": "^R-[0-9]{3}$",
+            "title": "Record Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "record_id"
+        ],
+        "title": "lookup_recordArguments",
+        "type": "object"
+      }
+    },
+    "write_count": {
+      "description": "Returns number of create attempts reaching the server.",
+      "inputSchema": {
+        "properties": {},
+        "title": "write_countArguments",
+        "type": "object"
+      }
+    },
+    "create_record": {
+      "description": "Increments write counter and writes disposable receipt.",
+      "inputSchema": {
+        "properties": {
+          "name": {
+            "description": "Required nonempty name string",
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "create_recordArguments",
+        "type": "object"
+      }
+    }
+  }
+}

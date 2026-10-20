@@ -1,0 +1,20 @@
+{
+  "running": false,
+  "answer": null,
+  "error": "Task failed; inspect the local session logs.",
+  "events": [
+    {
+      "type": "route",
+      "mode": "single",
+      "time": 1792484484.310795
+    },
+    {
+      "type": "request",
+      "job": "assistant-1792484484319603800",
+      "model": "qwen/qwen3.8-27b",
+      "time": 1792484484.345102
+    }
+  ],
+  "approval": null,
+  "screenshots": []
+}

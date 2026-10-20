@@ -1,0 +1,2 @@
+Arena stopped: groq returned HTTP 400; check model, credentials, quota, and endpoint.
+Completed checkpoints are retained. Fix configuration/budget or resume the same run.

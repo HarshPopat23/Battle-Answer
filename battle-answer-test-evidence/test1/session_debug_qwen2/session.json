@@ -1,0 +1,9 @@
+{
+  "identity": "32dba61822e25fe30da6f3fd4cd411646d93bcdb9233cd563446fa23a188a424",
+  "source": null,
+  "permissions": {
+    "allow_exec": false,
+    "allow_browser": false,
+    "allow_mcp": false
+  }
+}

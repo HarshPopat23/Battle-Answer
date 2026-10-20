@@ -1,0 +1,97 @@
+{
+ "version": 1,
+ "created": "2026-10-20 13:58:38",
+ "seed": 314674,
+ "agents_n": 2,
+ "cards_available": 2160,
+ "wave": 1,
+ "dir": "D:\\20+pro\\Battle-Answer\\Battle-Answer\\battle-answer-test-evidence\\test5\\tournament",
+ "has_baseline": false,
+ "agents": {
+  "a001": {
+   "card": {
+    "reasoning": {
+     "id": "evidence-first",
+     "name": "Evidence first",
+     "how": "Ground every claim in something checkable: the task text, the files it points to, the numbers given, documentation. Anything you cannot check gets labelled as an assumption."
+    },
+    "workflow": {
+     "id": "outline-first",
+     "name": "Outline first",
+     "how": "Write a skeleton outline, check the outline against every requirement in the task, fix it, and only then fill it in."
+    },
+    "strategy": {
+     "id": "simplest",
+     "name": "Simplest thing that works",
+     "how": "Pick the least complicated answer that fully does the job. Every extra part has to justify itself."
+    }
+   },
+   "solution": "D:\\20+pro\\Battle-Answer\\Battle-Answer\\battle-answer-test-evidence\\test5\\tournament\\r0\\a001.md",
+   "alive": true,
+   "eliminated_in": null,
+   "eliminated_by": null,
+   "byes": 0
+  },
+  "a002": {
+   "card": {
+    "reasoning": {
+     "id": "systems-thinking",
+     "name": "Systems thinking",
+     "how": "Map the moving parts, how they affect each other, and what happens second and third order. Optimise the whole system, not just the one part the task points at."
+    },
+    "workflow": {
+     "id": "smallest-version-first",
+     "name": "Smallest version first",
+     "how": "Produce the smallest complete version that actually works. Then extend it one step at a time, keeping it working after every step."
+    },
+    "strategy": {
+     "id": "user-empathy",
+     "name": "User empathy first",
+     "how": "Start from the person who will use this: their situation, their skill level, and what they will actually do next. Shape everything around that."
+    }
+   },
+   "solution": "D:\\20+pro\\Battle-Answer\\Battle-Answer\\battle-answer-test-evidence\\test5\\tournament\\r0\\a002.md",
+   "alive": true,
+   "eliminated_in": null,
+   "eliminated_by": null,
+   "byes": 0
+  }
+ },
+ "rounds": [
+  {
+   "n": 1,
+   "alive": [
+    "a001",
+    "a002"
+   ],
+   "matches": [
+    {
+     "id": "r1-m01",
+     "a": "a002",
+     "b": "a001",
+     "winner": null,
+     "loser": null,
+     "reason": null,
+     "survived": [],
+     "scores": null,
+     "source": null
+    }
+   ],
+   "bye": null,
+   "closed": false
+  }
+ ],
+ "champion": null,
+ "final": null,
+ "standalone": {
+  "identity": "cb83feca916bffab5c5ce4179390706b70c7eb7783dd129a28cac47a9e543f79",
+  "allow_exec": false,
+  "allow_browser": false,
+  "allow_mcp": false,
+  "snapshot": {},
+  "preflight": true,
+  "task_hash": "bae1949312602f30cc6790b11277f8cf5928f047124483369d26a76837e28791",
+  "baseline_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+  "rubric_hash": "f9b6b15ec72f664da49a02e314dbf86a81584170ff51b26a46f07e1a29d81844"
+ }
+}

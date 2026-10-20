@@ -1,0 +1,70 @@
+[
+  {
+    "time": 1792484395.1689692,
+    "method": "GET",
+    "path": "/"
+  },
+  {
+    "time": 1792484395.1689916,
+    "msg": "GET / - \"GET / HTTP/1.1\" 200 -"
+  },
+  {
+    "time": 1792484437.2900534,
+    "method": "GET",
+    "path": "/state"
+  },
+  {
+    "time": 1792484437.2900946,
+    "msg": "GET /state - \"GET /state HTTP/1.1\" 200 -"
+  },
+  {
+    "time": 1792484440.3802466,
+    "method": "GET",
+    "path": "/"
+  },
+  {
+    "time": 1792484440.3802593,
+    "msg": "GET / - \"GET / HTTP/1.1\" 200 -"
+  },
+  {
+    "time": 1792484443.9289715,
+    "method": "GET",
+    "path": "/state"
+  },
+  {
+    "time": 1792484443.9290023,
+    "msg": "GET /state - \"GET /state HTTP/1.1\" 200 -"
+  },
+  {
+    "time": 1792484443.932356,
+    "method": "GET",
+    "path": "/logs"
+  },
+  {
+    "time": 1792484443.9324129,
+    "msg": "GET /logs - \"GET /logs HTTP/1.1\" 200 -"
+  },
+  {
+    "time": 1792484482.6261957,
+    "method": "GET",
+    "path": "/state"
+  },
+  {
+    "time": 1792484482.6262233,
+    "msg": "GET /state - \"GET /state HTTP/1.1\" 200 -"
+  },
+  {
+    "time": 1792484485.326802,
+    "method": "GET",
+    "path": "/state"
+  },
+  {
+    "time": 1792484485.3268263,
+    "msg": "GET /state - \"GET /state HTTP/1.1\" 200 -"
+  },
+  {
+    "time": 1792484485.3416443,
+    "method": "GET",
+    "path": "/logs"
+  }
+]

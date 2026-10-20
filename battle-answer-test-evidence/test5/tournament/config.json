@@ -1,0 +1,67 @@
+{
+  "worker": {
+    "provider": "groq",
+    "model": "qwen/qwen3.8-27b",
+    "api_base": "https://api.groq.com/openai/v1",
+    "api_key_env": "GROQ_API_KEY",
+    "max_output_tokens": 4096,
+    "timeout": 90,
+    "retries": 5,
+    "temperature": null,
+    "token_parameter": ""
+  },
+  "judge": {
+    "provider": "groq",
+    "model": "openai/gpt-oss-120b",
+    "api_base": "https://api.groq.com/openai/v1",
+    "api_key_env": "GROQ_API_KEY",
+    "max_output_tokens": 4096,
+    "timeout": 90,
+    "retries": 5,
+    "temperature": null,
+    "token_parameter": ""
+  },
+  "fallback": null,
+  "agents": 2,
+  "concurrency": 1,
+  "judge_votes": 1,
+  "repair_attempts": 2,
+  "max_calls": 60,
+  "max_total_tokens": 500000,
+  "max_prompt_chars": 120000,
+  "max_tool_steps": 8,
+  "docker_image": "python:3.12-slim",
+  "command_timeout": 30,
+  "web_hosts": [],
+  "verify_argv": [],
+  "browser": {
+    "enabled": true,
+    "origins": [
+      "http://127.0.0.1:8910"
+    ],
+    "headless": true,
+    "executable_path": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "timeout_ms": 15000
+  },
+  "mcp_servers": [
+    {
+      "name": "fixture",
+      "command": "D:\\20+pro\\Battle-Answer\\Battle-Answer\\.venv\\Scripts\\python.exe",
+      "args": [
+        "D:\\20+pro\\Battle-Answer\\Battle-Answer\\battle-answer-test-evidence\\test4\\mcp_fixture.py"
+      ],
+      "url": "",
+      "env": null,
+      "headers": null,
+      "read_tools": [
+        "list_operations",
+        "lookup_record",
+        "write_count"
+      ],
+      "write_tools": [
+        "create_record"
+      ],
+      "timeout": 15
+    }
+  ]
+}

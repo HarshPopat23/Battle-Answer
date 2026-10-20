@@ -1,0 +1,2 @@
+Arena stopped: Model did not finish a text response; increase output limit or use a text-capable model.
+Completed checkpoints are retained. Fix configuration/budget or resume the same run.

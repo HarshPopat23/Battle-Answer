@@ -1,0 +1,13 @@
+{
+  "bad_call_rejected": true,
+  "rejection_error": "Arguments do not satisfy the MCP tool schema; no request was sent.",
+  "valid_call_result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"id\": \"R-001\",\n  \"status\": \"active\"\n}"
+      }
+    ],
+    "isError": false
+  }
+}

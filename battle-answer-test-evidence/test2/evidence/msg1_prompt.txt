@@ -1,0 +1,1 @@
+Create a project requirements document for CampusQueue: - Backend: FastAPI. - Database: PostgreSQL. - No Redis or external paid services. - Every booking belongs to exactly one student. - A student may have at most three active bookings. - Store timestamps in UTC. Save these requirements in requirements.md. Do not implement the API yet.

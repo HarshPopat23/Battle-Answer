@@ -1,0 +1,11 @@
+﻿{
+  "agents": 2,
+  "matches": 1,
+  "judge_votes_per_match": 1,
+  "base_generation_requests": 7,
+  "preflight_requests": 2,
+  "minimum_requests_new_run": 9,
+  "request_limit": 60,
+  "token_limit": 500000,
+  "note": "Tool turns, protocol repairs, fallback, and HTTP retries add requests. Tokens and currency cost depend on models and task size."
+}
