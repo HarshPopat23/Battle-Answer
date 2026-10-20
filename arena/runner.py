@@ -387,13 +387,13 @@ class Runner:
                 continue
             changes.append(name)
             try:
-                old = (source / name).read_text().splitlines(keepends=True) if name in before else []
-                new = (work / name).read_text().splitlines(keepends=True) if name in after else []
+                old = (source / name).read_text(encoding='utf-8').splitlines(keepends=True) if name in before else []
+                new = (work / name).read_text(encoding='utf-8').splitlines(keepends=True) if name in after else []
                 for line in difflib.unified_diff(old, new, fromfile='a/' + name, tofile='b/' + name):
                     patch.append(line if line.endswith('\n') else line + '\n\\ No newline at end of file\n')
             except UnicodeError:
                 reviews.append('Binary change requires manual copying: ' + name)
-        (self.directory / 'winner.patch').write_text(''.join(patch), encoding='utf-8')
+        (self.directory / 'winner.patch').write_text(''.join(patch), encoding='utf-8', newline='\n')
         report = {'champion': champion, 'rounds': B.rounds_played(self.state), 'agents': self.state['agents_n'],
                   'changed_files': changes, 'verification': verification, 'review_notes': reviews,
                   'status': 'needs_review' if reviews else 'passed_configured_checks',

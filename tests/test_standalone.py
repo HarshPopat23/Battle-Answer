@@ -189,9 +189,14 @@ class ToolTests(Temp):
                 self.tool.resolve(path)
 
     def test_symlinks_and_disabled_tools(self):
-        (self.work / 'link').symlink_to(self.root)
-        with self.assertRaises(ArenaError):
-            self.tool.resolve('link/file')
+        try:
+            (self.work / 'link').symlink_to(self.root)
+            has_symlink = True
+        except OSError:
+            has_symlink = False
+        if has_symlink:
+            with self.assertRaises(ArenaError):
+                self.tool.resolve('link/file')
         with self.assertRaises(ArenaError):
             self.tool.call('run_command', {'argv': ['echo', 'bad']})
         readonly = Tools(self.work, cfg(), read_only=True)
@@ -204,7 +209,10 @@ class ToolTests(Temp):
         (self.work / 'ok.py').write_text('pass\n')
         (self.work / '.env').write_text('KEY=secret')
         (self.work / 'credentials.json').write_text('{}')
-        (self.work / 'link').symlink_to(self.root)
+        try:
+            (self.work / 'link').symlink_to(self.root)
+        except OSError:
+            pass
         target = self.work / 'run' / 'source'
         target.mkdir(parents=True)
         snapshot(self.work, target)
