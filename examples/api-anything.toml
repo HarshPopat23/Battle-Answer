@@ -1,0 +1,17 @@
+[worker]
+provider = "groq"
+model = "llama-3.3-70b-versatile"
+api_key_env = "GROQ_API_KEY"
+
+[[mcp_servers]]
+name = "api_anything"
+command = "api-anything"
+args = ["mcp"]
+read_tools = ["list_sites", "list_operations"]
+# Operation dispatch can have side effects. Require approval conservatively.
+write_tools = ["call_operation", "login"]
+timeout = 60
+# Install the server yourself. Its private HOME starts without your login sessions.
+# To deliberately reuse your user-installed session state, uncomment:
+# env = { HOME = "HOME", USERPROFILE = "USERPROFILE" }
+# On Linux/macOS use only HOME if USERPROFILE is not defined.

@@ -48,15 +48,25 @@ def lock_run(directory):
         path.unlink(missing_ok=True)
 
 
-def config_identity(config, allow_exec):
+def config_identity(config, allow_exec, allow_browser=False, allow_mcp=False):
     public = config.public()
     # Budgets may be raised explicitly on resume, without silently changing model/task semantics.
     for key in ('max_calls', 'max_total_tokens', 'concurrency'):
         public.pop(key)
-    return digest({'config': public, 'allow_exec': allow_exec})
+    if not config.browser.enabled and not config.browser.origins:
+        public.pop('browser')
+    if not config.mcp_servers:
+        public.pop('mcp_servers')
+    identity = {'config': public, 'allow_exec': allow_exec}
+    if allow_browser:
+        identity['allow_browser'] = True
+    if allow_mcp:
+        identity['allow_mcp'] = True
+    return digest(identity)
 
 
-def create_run(directory, task, config, workspace=None, baseline=None, seed=None, allow_exec=False):
+def create_run(directory, task, config, workspace=None, baseline=None, seed=None, allow_exec=False,
+               allow_browser=False, allow_mcp=False):
     directory = Path(directory).absolute()
     if directory.exists():
         raise ArenaError('Run directory already exists. Use resume or choose a new directory.')
@@ -78,7 +88,8 @@ def create_run(directory, task, config, workspace=None, baseline=None, seed=None
             source.mkdir()
         state = B.new_state(config.agents, seed if seed is not None else random.SystemRandom().randrange(1000000),
                             B.load_strategies(), str(directory), wave=config.concurrency, has_baseline=baseline is not None)
-        state['standalone'] = {'identity': config_identity(config, allow_exec), 'allow_exec': allow_exec,
+        state['standalone'] = {'identity': config_identity(config, allow_exec, allow_browser, allow_mcp), 'allow_exec': allow_exec,
+                               'allow_browser': allow_browser, 'allow_mcp': allow_mcp,
                                'snapshot': fingerprint(source), 'preflight': False,
                                'task_hash': digest(task), 'baseline_hash': digest(baseline),
                                'rubric_hash': hashlib.sha256(Path(B.RUBRIC_PATH).read_bytes()).hexdigest()}
@@ -114,7 +125,7 @@ class ComparisonTools:
 
 
 class Runner:
-    def __init__(self, directory, config, client_factory=Client):
+    def __init__(self, directory, config, client_factory=Client, approve=None, on_event=None):
         self.directory = Path(directory).resolve()
         self.config = config
         try:
@@ -122,7 +133,8 @@ class Runner:
         except (OSError, ValueError):
             raise ArenaError('No readable arena.json; initialize a new standalone run first.') from None
         standalone = self.state.get('standalone')
-        if not standalone or standalone['identity'] != config_identity(config, standalone['allow_exec']):
+        if not standalone or standalone['identity'] != config_identity(config, standalone['allow_exec'],
+                                standalone.get('allow_browser', False), standalone.get('allow_mcp', False)):
             raise ArenaError('Run configuration differs from its checkpoint (only budgets/concurrency may change).')
         if Path(self.state['dir']).resolve() != self.directory:
             raise ArenaError('Checkpoint uses absolute paths; resume from its original run directory.')
@@ -138,8 +150,11 @@ class Runner:
                 if not Path(output).is_file() or hashlib.sha256(Path(output).read_bytes()).hexdigest() != sha:
                     raise ArenaError('Completed output changed: ' + output)
         self.allow_exec = standalone['allow_exec']
+        self.allow_browser = standalone.get('allow_browser', False)
+        self.allow_mcp = standalone.get('allow_mcp', False)
+        self.approve = approve
         self.budget = Budget(config, self.directory / 'usage.json', self.directory / 'audit.jsonl')
-        self.agent = Agent(config, self.budget, client_factory)
+        self.agent = Agent(config, self.budget, client_factory, on_event)
 
     def workspace(self, aid):
         path = self.directory / 'workspaces' / aid
@@ -213,11 +228,17 @@ class Runner:
             return
         aid = job['agent']
         root = self.workspace(job['opponent'] if job['kind'] == 'attacker' else aid)
-        tools = Tools(root, self.config, allow_exec=self.allow_exec, read_only=job['kind'] == 'attacker')
-        result = self.agent.run(job['kind'], payload, tools, job['id'])
-        verification = None
-        if self.config.verify_argv and job['kind'] in ('competitor', 'defender'):
-            verification = tools.run_command(list(self.config.verify_argv))
+        from .capabilities import Capabilities
+        tools = Capabilities(root, self.config, allow_exec=self.allow_exec, read_only=job['kind'] == 'attacker',
+                             artifacts=self.directory / 'artifacts' / job['id'], allow_browser=self.allow_browser,
+                             allow_mcp=self.allow_mcp, approve=self.approve)
+        try:
+            result = self.agent.run(job['kind'], payload, tools, job['id'])
+            verification = None
+            if self.config.verify_argv and job['kind'] in ('competitor', 'defender'):
+                verification = tools.run_command(list(self.config.verify_argv))
+        finally:
+            tools.close()
         if job['kind'] == 'competitor':
             values = [result['solution']]
         elif job['kind'] == 'attacker':

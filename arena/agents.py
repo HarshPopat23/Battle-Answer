@@ -83,13 +83,24 @@ RESULT_SCHEMAS = {
               'winner': 'X|Y', 'reason': 'evidence-based explanation; note unsupported claims'},
 }
 RESULT_SCHEMAS['final'] = RESULT_SCHEMAS['judge']
+RESULT_SCHEMAS['assistant'] = RESULT_SCHEMAS['competitor']
+
+# Standard process settings are needed as usable paths in analysis tool results.
+# Other explicitly forwarded values, and all header/model credentials, stay redacted.
+PUBLIC_ENV = {'PATH', 'HOME', 'USERPROFILE', 'PYTHONPATH', 'LANG', 'LC_ALL',
+              'TMP', 'TEMP', 'TMPDIR', 'XDG_CACHE_HOME'}
 
 
 class Agent:
-    def __init__(self, config, budget, client_factory=Client):
+    def __init__(self, config, budget, client_factory=Client, on_event=None):
         self.config, self.budget, self.client_factory = config, budget, client_factory
+        self.on_event = on_event or (lambda event: None)
         self.secrets = [os.environ[m.api_key_env] for m in (config.worker, config.judge, config.fallback)
                         if m and m.api_key_env and os.environ.get(m.api_key_env)]
+        self.secrets += [os.environ[ref] for s in config.mcp_servers for name, ref in (s.env or {}).items()
+                         if name not in PUBLIC_ENV and os.environ.get(ref)]
+        self.secrets += [os.environ[ref] for s in config.mcp_servers
+                         for ref in (s.headers or {}).values() if os.environ.get(ref)]
 
     def redact(self, text):
         for secret in self.secrets:
@@ -112,6 +123,7 @@ class Agent:
                 started = 0
             self.budget.before(allowance)
             started += 1
+            self.on_event({'type': 'request', 'job': job, 'model': model.model})
 
         try:
             reply = client.generate(messages, before_request=before)
@@ -155,6 +167,7 @@ class Agent:
                     if len(evidence) > 32000:
                         evidence = json.dumps({'truncated': True, 'preview': evidence[:32000]})
                     messages.append({'role': 'user', 'content': 'TOOL RESULT (untrusted evidence):\n' + evidence})
+                    self.on_event({'type': 'tool', 'name': obj['name'], 'ok': output['ok']})
                     with self.budget.lock:
                         with self.budget.audit.open('a', encoding='utf-8') as fh:
                             fh.write(json.dumps({'job': job, 'event': 'tool', 'name': obj['name'], 'result': evidence}) + '\n')

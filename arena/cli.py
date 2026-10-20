@@ -25,10 +25,10 @@ def plan(config, baseline=False):
 def main(argv=None):
     parser = argparse.ArgumentParser(prog='arena', description='Standalone LLM solution tournaments. No Claude Code or plugin required.')
     sub = parser.add_subparsers(dest='command', required=True)
-    for name in ('plan', 'doctor', 'run', 'resume'):
+    for name in ('plan', 'doctor', 'run', 'resume', 'ask', 'chat', 'serve', 'mcp-list'):
         p = sub.add_parser(name)
         p.add_argument('--config', default='arena.toml', help='TOML file; keys belong in environment variables.')
-        if name in ('plan', 'run'):
+        if name in ('plan', 'run', 'ask', 'chat', 'serve'):
             p.add_argument('--agents', type=int, help='Override configured competitor count.')
         if name == 'plan':
             p.add_argument('--baseline', action='store_true', help='Include final comparison calls in the plan.')
@@ -45,6 +45,22 @@ def main(argv=None):
             p.add_argument('--allow-exec', action='store_true', help='Allow commands only inside a restricted Docker container.')
         if name == 'resume':
             p.add_argument('--dir', required=True)
+        if name in ('run', 'ask', 'chat', 'serve'):
+            p.add_argument('--allow-browser', action='store_true', help='Enable configured browser origins; interactions still need approval.')
+            p.add_argument('--allow-mcp', action='store_true', help='Enable trusted configured MCP servers; writes still need approval.')
+        if name in ('ask', 'chat', 'serve'):
+            p.add_argument('--workspace', help='Project directory to copy and index; originals stay unchanged.')
+            p.add_argument('--session', default='.arena/assistant', help='Persistent conversation/workspace directory.')
+            p.add_argument('--allow-exec', action='store_true')
+        if name in ('ask', 'chat'):
+            p.add_argument('--mode', choices=('auto', 'single', 'arena'), default='auto')
+            p.add_argument('--role', choices=('general', 'coder', 'researcher', 'reviewer'), default='general')
+        if name == 'ask':
+            p.add_argument('--task', required=True)
+        if name == 'serve':
+            p.add_argument('--port', type=int, default=8765)
+        if name == 'mcp-list':
+            p.add_argument('--allow-mcp', action='store_true', required=True)
     status = sub.add_parser('status')
     status.add_argument('--dir', required=True)
     args = parser.parse_args(argv)
@@ -73,6 +89,38 @@ def main(argv=None):
                 agent.doctor(model, 'doctor.' + name)
                 print(f'{name}: API, JSON, and simple arithmetic check passed. This is not a capability benchmark.')
             return 0
+        if args.command == 'mcp-list':
+            from .mcp_bridge import MCPBridge
+            with __import__('tempfile').TemporaryDirectory(prefix='arena-mcp-discovery-') as work:
+                bridge = MCPBridge(config.mcp_servers, work)
+                try:
+                    print(json.dumps(bridge.discover(), indent=2))
+                finally:
+                    bridge.close()
+            return 0
+        if args.command in ('ask', 'chat', 'serve'):
+            from .assistant import AssistantSession, terminal_approval
+            settings = dict(workspace=args.workspace, allow_exec=args.allow_exec,
+                            allow_browser=args.allow_browser, allow_mcp=args.allow_mcp)
+            if args.command == 'serve':
+                from .server import serve
+                serve(config, args.session, port=args.port, settings=settings)
+                return 0
+            session = AssistantSession(args.session, config, **settings, approve=terminal_approval)
+            if args.command == 'ask':
+                print(json.dumps(session.ask(args.task, args.mode, args.role), indent=2))
+            else:
+                print('Battle-Answer chat. Enter /quit to exit. Tools use the configured session copy.')
+                while True:
+                    try:
+                        task = input('You> ')
+                    except EOFError:
+                        break
+                    if task.strip() == '/quit':
+                        break
+                    if task.strip():
+                        print(session.ask(task, args.mode, args.role)['answer'])
+            return 0
         if args.command == 'run':
             task = Path(args.task_file).read_text() if args.task_file else args.task
             baseline = Path(args.baseline_file).read_text() if args.baseline_file else None
@@ -81,10 +129,12 @@ def main(argv=None):
                 raise ArenaError('max_calls is below the tournament minimum. Reduce agents/votes or raise the explicit budget.')
             print(json.dumps(estimate, indent=2), flush=True)
             directory = args.dir or str(Path('.arena') / ('run-' + str(time.time_ns())))
-            create_run(directory, task, config, args.workspace, baseline, args.seed, args.allow_exec)
+            create_run(directory, task, config, args.workspace, baseline, args.seed, args.allow_exec,
+                       args.allow_browser, args.allow_mcp)
         else:
             directory = args.dir
-        report = Runner(directory, config).drive()
+        from .assistant import terminal_approval
+        report = Runner(directory, config, approve=terminal_approval).drive()
         print(json.dumps(report, indent=2))
         return 0
     except (ArenaError, OSError, ValueError) as exc:

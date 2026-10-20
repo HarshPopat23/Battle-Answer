@@ -4,12 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "arena-standalone"
-version = "0.2.0"
+version = "0.3.0"
 description = "Provider-configurable solution tournaments with local tools and evidence"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {file = "LICENSE"}
 dependencies = []
+
+[project.optional-dependencies]
+browser = ["playwright>=1.50,<2"]
+mcp = ["mcp>=1.30,<2", "jsonschema>=4.23,<5"]
+documents = ["pypdf>=5,<7"]
+all = ["playwright>=1.50,<2", "mcp>=1.30,<2", "jsonschema>=4.23,<5", "pypdf>=5,<7"]
 
 [project.scripts]
 arena = "arena.cli:main"
@@ -18,4 +24,4 @@ arena = "arena.cli:main"
 packages = ["arena"]
 
 [tool.setuptools.package-data]
-arena = ["strategies.json", "rubric.md", "prompts.md"]
+arena = ["strategies.json", "rubric.md", "prompts.md", "web/*.html"]

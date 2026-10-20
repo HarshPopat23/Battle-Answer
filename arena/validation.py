@@ -28,7 +28,7 @@ def nonempty(value, name):
 
 
 def validate_result(kind, value):
-    if kind == "competitor":
+    if kind in ("competitor", "assistant"):
         nonempty(value.get("solution"), "solution")
     elif kind == "attacker":
         attacks = value.get("attacks")
