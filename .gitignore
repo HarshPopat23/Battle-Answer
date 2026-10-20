@@ -4,3 +4,9 @@ __pycache__/
 .venv/
 *.tmp
 .arena/
+.env
+.env.*
+arena.toml
+*.egg-info/
+build/
+dist/

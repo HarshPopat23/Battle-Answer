@@ -1,0 +1,14 @@
+[worker]
+provider = "ollama"
+model = "qwen3:8b"
+api_base = "http://localhost:11434/v1"
+max_output_tokens = 4096
+
+[arena]
+agents = 4
+concurrency = 1
+judge_votes = 2
+max_calls = 200
+max_total_tokens = 500000
+
+# Pull a model with Ollama first. For difficult tasks, configure a stronger [judge].

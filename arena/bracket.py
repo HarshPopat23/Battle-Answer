@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""bracket.py: the tournament state machine behind /arena.
+"""bracket.py: the tournament state machine used by Arena.
 
 The whole arena lives in one JSON file (arena.json), so the orchestrator never
 loses track of who is alive, who fought whom and what happens next, even if its
@@ -37,12 +37,12 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 SELF = os.path.abspath(__file__)
 STRATEGIES_PATH = os.path.join(HERE, "strategies.json")
-SKILL_PATH = os.path.join(HERE, "SKILL.md")
+PROMPTS_PATH = os.path.join(HERE, "prompts.md")
 RUBRIC_PATH = os.path.join(HERE, "rubric.md")
 
 DEFAULT_AGENTS = 100
 QUICK_AGENTS = 16
-DEFAULT_WAVE = 10          # Claude Code runs at most 10 tool calls at once by default
+DEFAULT_WAVE = 10          # Low-level planning default; standalone runner is configurable.
 ROOT = ".arena"
 LATEST = "LATEST"
 STATE_FILE = "arena.json"
@@ -644,13 +644,13 @@ _TEMPLATE_RE = re.compile(r"<!-- template:([a-z]+) -->\s*```text\n(.*?)\n```\s*<
 _PLACEHOLDER_RE = re.compile(r"\{\{(\w+)\}\}")
 
 
-def load_templates(path=SKILL_PATH):
+def load_templates(path=PROMPTS_PATH):
     with open(path, encoding="utf-8") as fh:
         text = fh.read()
     found = {m.group(1): m.group(2) for m in _TEMPLATE_RE.finditer(text)}
     missing = [t for t in TEMPLATES if t not in found]
     if missing:
-        raise ArenaError("SKILL.md is missing prompt templates: %s" % ", ".join(missing))
+        raise ArenaError("prompts.md is missing prompt templates: %s" % ", ".join(missing))
     return found
 
 
