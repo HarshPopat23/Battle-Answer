@@ -2,6 +2,7 @@
 from dataclasses import replace
 import http.client
 import json
+import os
 import re
 from pathlib import Path
 import tempfile
@@ -9,7 +10,9 @@ import threading
 import time
 import unittest
 import zipfile
+from unittest.mock import patch
 
+from arena.agents import Agent, Budget
 from arena.assistant import AssistantSession, choose_mode
 from arena.config import ArenaError, Browser, Config, MCPServer, Model
 from arena.context import ContextStore, read_document
@@ -42,6 +45,16 @@ class Temp(unittest.TestCase):
 
 
 class Configuration(Temp):
+    def test_mcp_credentials_redact_without_corrupting_home_paths(self):
+        server = MCPServer('fixture', command='fixture', env={'HOME': 'TEST_HOME_PATH', 'TOKEN': 'TEST_MCP_TOKEN'},
+                           headers={'Authorization': 'TEST_MCP_HEADER'})
+        cfg = config(mcp_servers=(server,))
+        with patch.dict(os.environ, {'TEST_HOME_PATH': '/home/fixture', 'TEST_MCP_TOKEN': 'fixture-token-123',
+                                     'TEST_MCP_HEADER': 'Bearer fixture-header-456'}):
+            agent = Agent(cfg, Budget(cfg, self.root / 'usage.json', self.root / 'audit.jsonl'))
+            result = agent.redact('/home/fixture/project.py fixture-token-123 Bearer fixture-header-456')
+        self.assertEqual(result, '/home/fixture/project.py [REDACTED] [REDACTED]')
+
     def test_permissions_are_explicit(self):
         for url in ('http://example.com', 'https://example.com/path', 'https://u:p@example.com', 'https://*.example.com'):
             with self.subTest(url=url), self.assertRaises((ArenaError, ValueError)):

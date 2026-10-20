@@ -85,6 +85,11 @@ RESULT_SCHEMAS = {
 RESULT_SCHEMAS['final'] = RESULT_SCHEMAS['judge']
 RESULT_SCHEMAS['assistant'] = RESULT_SCHEMAS['competitor']
 
+# Standard process settings are needed as usable paths in analysis tool results.
+# Other explicitly forwarded values, and all header/model credentials, stay redacted.
+PUBLIC_ENV = {'PATH', 'HOME', 'USERPROFILE', 'PYTHONPATH', 'LANG', 'LC_ALL',
+              'TMP', 'TEMP', 'TMPDIR', 'XDG_CACHE_HOME'}
+
 
 class Agent:
     def __init__(self, config, budget, client_factory=Client, on_event=None):
@@ -92,8 +97,10 @@ class Agent:
         self.on_event = on_event or (lambda event: None)
         self.secrets = [os.environ[m.api_key_env] for m in (config.worker, config.judge, config.fallback)
                         if m and m.api_key_env and os.environ.get(m.api_key_env)]
-        self.secrets += [os.environ[ref] for s in config.mcp_servers for values in (s.env, s.headers)
-                         for ref in (values or {}).values() if os.environ.get(ref)]
+        self.secrets += [os.environ[ref] for s in config.mcp_servers for name, ref in (s.env or {}).items()
+                         if name not in PUBLIC_ENV and os.environ.get(ref)]
+        self.secrets += [os.environ[ref] for s in config.mcp_servers
+                         for ref in (s.headers or {}).values() if os.environ.get(ref)]
 
     def redact(self, text):
         for secret in self.secrets:
