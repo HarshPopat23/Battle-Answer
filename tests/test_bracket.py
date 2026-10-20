@@ -1,4 +1,4 @@
-"""Tests for skills/arena/bracket.py. Standard library only.
+"""Tests for arena/bracket.py. Standard library only.
 
     python3 -m unittest discover -s tests -v
 
@@ -18,7 +18,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-SKILL = os.path.join(REPO, "skills", "arena")
+SKILL = os.path.join(REPO, "arena")
 BRACKET = os.path.join(SKILL, "bracket.py")
 sys.path.insert(0, SKILL)
 

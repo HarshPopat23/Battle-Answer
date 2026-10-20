@@ -1,0 +1,19 @@
+[worker]
+provider = "groq"
+model = "llama-3.3-70b-versatile"
+api_key_env = "GROQ_API_KEY"
+max_output_tokens = 4096
+
+# Choose a judge model you have evaluated for your task. It may use another provider.
+[judge]
+provider = "groq"
+model = "openai/gpt-oss-120b"
+api_key_env = "GROQ_API_KEY"
+max_output_tokens = 4096
+
+[arena]
+agents = 4
+concurrency = 2
+judge_votes = 2
+max_calls = 200
+max_total_tokens = 500000

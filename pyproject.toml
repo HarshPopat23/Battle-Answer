@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arena-standalone"
+version = "0.2.0"
+description = "Provider-configurable solution tournaments with local tools and evidence"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {file = "LICENSE"}
+dependencies = []
+
+[project.scripts]
+arena = "arena.cli:main"
+
+[tool.setuptools]
+packages = ["arena"]
+
+[tool.setuptools.package-data]
+arena = ["strategies.json", "rubric.md", "prompts.md"]

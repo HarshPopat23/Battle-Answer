@@ -1,214 +1,143 @@
-# The Arena skill
+# Arena Standalone
 
-When Claude keeps giving you bad answers, make 100 versions of it fight to the death. One Claude
-Code skill. Free, MIT, no signup, no API key, nothing to connect.
+Give one task to several LLM workers, let their solutions challenge and improve each other, and select a winner with a configurable judge. This fork replaces the Claude Code plugin with a standalone Python application.
 
-You use it when you are not happy with what Claude gave you. Instead of asking again and again,
-`/arena` spins up 100 sub-agents and gives every one of them the exact same task, word for word.
-Each one gets a different strategy card: a way of reasoning, a workflow and a strategy, so each one
-attacks the task differently. Then they pair off. Each attacks the other's solution, each defends
-and revises its own, and a judge scores the match on a written rubric. The loser is out. 100
-becomes 50, then 25, 13, 7, 4, 2, 1.
+The original strategy dealer, rubric, and elimination bracket are preserved from [Jake Schincariol's Arena](https://github.com/Jakeschincariol/arena-skill). The MIT license and attribution remain intact.
 
-What comes back is the one solution that survived, the attacks it beat on the way, and how many
-rounds it took.
+## Quick start
 
-**It never touches your files.** Every sub-agent writes inside `.arena/`. The winning answer comes
-back to you, and using it is your call.
-
-## Install
-
-Paste this into Claude:
-
-```
-https://github.com/Jakeschincariol/arena-skill
-
-Install this skill, then confirm /arena works.
-```
-
-Or copy the folder yourself, in Claude Code:
+Requires Python 3.11+. No runtime Python dependencies or Claude Code installation.
 
 ```bash
-git clone https://github.com/Jakeschincariol/arena-skill.git
-cp -r arena-skill/skills/arena ~/.claude/skills/
+git clone https://github.com/HarshPopat23/arena-skill.git
+cd arena-skill
+# Until this PR is merged:
+git switch feat/standalone-api-arena
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+cp examples/groq.toml arena.toml
+export GROQ_API_KEY='your-key-here'
+arena plan --config arena.toml
+arena doctor --config arena.toml
+arena run --config arena.toml --task "Design a simple study planner" --dir .arena/planner
 ```
 
-Or as a plugin:
+On Windows PowerShell, activate with `.venv\Scripts\Activate.ps1` and set `$env:GROQ_API_KEY = 'your-key-here'` instead of `export`. Commands also work as `python -m arena ...` without installation.
 
-```
-/plugin marketplace add Jakeschincariol/arena-skill
-/plugin install arena-skill@arena-skill
-```
+Model IDs in examples are starting points, not availability promises. Choose IDs available to your account from the provider's current model list. API usage is billed by your provider; local models need suitable hardware. Keep keys in environment variables, not config files, task text, commits, or PRs.
 
-Claude Code namespaces plugin skills, so installed as a plugin it shows up as `/arena-skill:arena`.
-Copy the folder instead if you want plain `/arena`. Project-local instead of global: copy the same
-folder into your repo's `.claude/skills/`.
+## Providers and model roles
 
-It needs Claude Code, because it spawns sub-agents with the Agent tool, and Python 3.8 or newer.
-Nothing to pip install.
-
-## Use it
-
-```
-/arena
-/arena --quick write the headline for our pricing page
-/arena --agents 32 fix the flaky test in tests/test_api.py
-/arena --seed 7 plan my launch week, I have 6 hours a day
-```
-
-On its own, `/arena` takes your last request as the task and the answer you did not like as the one
-to beat. Claude can also reach for it without the slash, when you say something like "that's a bad
-answer, make them compete". When it starts itself like that, it asks before it spends anything.
-
-| flag | what it does |
+| `provider` | Contract / default credential variable |
 | --- | --- |
-| `--agents N` | N competitors. Default 100. |
-| `--quick` | 16 competitors. The everyday setting. |
-| `--seed S` | Same seed, same cards and same bracket. Default random, and recorded. |
-| `--wave W` | Sub-agents per wave. Default 10. Only raise it if you raised Claude Code's limit. |
+| `groq` | OpenAI-compatible chat completions / `GROQ_API_KEY` |
+| `openai` | Chat completions / `OPENAI_API_KEY` |
+| `openrouter` | Chat completions / `OPENROUTER_API_KEY` |
+| `ollama` | Local OpenAI-compatible API at `http://localhost:11434/v1`; no key by default |
+| `openai-compatible` | Custom `api_base` required / `ARENA_API_KEY` by default |
+| `anthropic` | Native Messages API / `ANTHROPIC_API_KEY` |
+| `gemini` | Native GenerateContent API / `GEMINI_API_KEY` |
 
-## How it works
+Each role has independent model, endpoint, key environment reference, timeout, output-token limit, and retries. `examples/mixed.toml` demonstrates a Gemini worker, Anthropic judge, and Groq fallback; `examples/ollama.toml` demonstrates local inference.
 
-1. **Spawn.** N sub-agents, one Agent call each. Every one gets the same task text, byte for byte
-   (a test checks it), plus one strategy card. There are 15 reasoning modes (first principles,
-   inversion, analogy, adversarial, constraint first, worked example, Socratic, contrarian, systems
-   thinking and more), 12 workflows (draft, critique, rewrite; outline first; test first; research,
-   then synthesise; three drafts, pick one...) and 12 strategies (simplest thing that works, maximal
-   rigour, user empathy first, edge cases first, speed...). That is 2,160 different cards. The
-   dealer gives each agent its own, with no repeats.
-2. **Attack.** Solutions are paired, and the pairing avoids putting two agents with the same
-   reasoning mode against each other. Each side attacks the other's solution through its own card:
-   what is wrong, what requirement it missed, the exact input that breaks it. Up to 7 attacks,
-   labelled FATAL, MAJOR or MINOR.
-3. **Defend.** Each side answers every attack it took, conceding or rebutting with evidence, then
-   rewrites its solution to fix everything it conceded.
-4. **Judge.** A separate judge sub-agent reads both revised solutions, checks every attack itself,
-   and scores both on [the rubric](skills/arena/rubric.md): correctness 30, completeness against the
-   task 25, robustness to the attacks raised 20, specificity 15, clarity 10. The judge never sees
-   the cards. `bracket.py` does the arithmetic: the higher total goes through, and a solution with a
-   verified fatal flaw cannot beat one without. The loser is out.
-5. **Repeat.** The survivors carry their revised solutions into the next round. An odd number means
-   one bye, never to the same agent twice while anyone else is waiting for one.
-6. **Result.** One solution left. You get it, the attacks it survived, its card and the round count.
-   If you started from an answer you rejected, a last judge compares the winner with it blind and
-   the skill tells you the score, even when the old answer wins.
+Support means these API contracts, not every possible model. Models must follow the JSON action/answer protocol and reason well enough for the task. Native API function calling is not required. Malformed responses receive bounded repair attempts, then an explicitly configured fallback if present. Arena stops if that fails rather than inventing output. `token_parameter` overrides `max_tokens` / `max_completion_tokens` for compatible endpoints. Temperature is omitted unless configured.
 
-The 100-agent bracket, from `python3 skills/arena/bracket.py plan`:
+Use a stronger, independently evaluated `[judge]` when weaker workers are inadequate. `[fallback]` applies to either role after protocol failures; it is never selected silently and actual model usage is logged. `arena doctor` makes two small paid calls checking JSON/simple arithmetic. A new run also performs those checks. They are readiness signals, not coding or judging benchmarks.
 
-```
-  round  alive  matches  bye  sub-agent calls  waves
-  spawn    100        -    -              100     10
-      1    100       50    -              250     25
-      2     50       25    -              125     13
-      3     25       12  yes               60      8
-      4     13        6  yes               30      5
-      5      7        3  yes               15      3
-      6      4        2    -               10      3
-      7      2        1    -                5      3
-  total                                 595     70
+Reference contracts: [Groq](https://console.groq.com/docs/api-reference), [Anthropic](https://platform.claude.com/docs/en/api/overview), [Gemini](https://ai.google.dev/api/generate-content), and your compatible endpoint's documentation.
 
-  alive per round: 100 -> 50 -> 25 -> 13 -> 7 -> 4 -> 2 -> 1
-```
+## Tournament
 
-The whole tournament lives in one JSON file, managed by `bracket.py`. The main Claude session
-only runs the loop and never reads the hundreds of solution files: every sub-agent writes its work
-to disk and replies with one line, so the main context holds receipts and bookkeeping, not the
-work. If the conversation gets compacted halfway through, `bracket.py next` picks it up from the
-file.
+1. Competitors receive the exact same task plus distinct reasoning/workflow/strategy cards.
+2. They solve it with the available tools.
+3. Paired competitors challenge each other's answers and defend/revise their own work.
+4. The judge scores candidates labeled X/Y, without cards or agent IDs in the wrapper. Default: two votes with reversed candidate order; average scores, retain fatal findings, report disagreements.
+5. Winners advance until one remains. An optional baseline receives a final blinded comparison.
 
-## What it costs
+Swapping order reduces one form of position bias; it does not make votes independent or guarantee correctness. Candidate content itself can reveal its source. A tournament does not make a weak model reliable automatically.
 
-The skill is free. The tokens are yours, and 100 agents is a lot of them.
-
-| agents | rounds | sub-agent calls | waves of 10 |
-| --- | --- | --- | --- |
-| 100, the default | 7 | 595 | 70 |
-| 64 | 6 | 379 | 49 |
-| 32 | 5 | 187 | 28 |
-| 16, `--quick` | 4 | 91 | 16 |
-| 8 | 3 | 43 | 10 |
-
-Add one call when there is a rejected answer to beat. Every call reads the task and one or two
-solutions, so the bill grows with the size of the task. Use `--quick` or `--agents 16` for
-everyday things and save the full 100 for the answer that matters. The skill prints these numbers
-before it starts, and `python3 skills/arena/bracket.py plan --agents N` prints them any time.
-
-## The tool
-
-`bracket.py` is standard-library Python. It is the reason the orchestrator never loses track.
+## Coding tasks and tools
 
 ```bash
-python3 bracket.py plan --agents 100        # rounds, calls, waves. Writes nothing
-python3 bracket.py init --agents 100 --seed 7 --task-file task.md [--baseline-file old.md]
-python3 bracket.py next                     # what to do now, with the exact command
-python3 bracket.py prompts attack           # write every sub-agent brief, list the jobs in waves
-python3 bracket.py pairings                 # this round's matches, including the bye
-python3 bracket.py collect                  # record the judges' verdicts
-python3 bracket.py record r3-m07 a042 --reason "..."   # or record one by hand
-python3 bracket.py advance                  # eliminate the losers, pair the survivors
-python3 bracket.py status                   # alive and eliminated, per round
-python3 bracket.py winner                   # the survivor, the attacks it survived, the rounds
+arena run --config arena.toml \
+  --task "Fix the parser bug and add a regression test" \
+  --workspace /absolute/path/to/project \
+  --dir .arena/parser-fix
 ```
 
-The tests run a full 100-agent tournament through that command line with random winners and check
-it ends with exactly one survivor, plus 16, 7 and 1 agents, the dealer's guarantees, and every
-phase from spawn to the final check with stand-in sub-agents:
+Each competitor receives a separate filtered project copy. Original files are never automatically edited.
+
+| Tool | Boundary |
+| --- | --- |
+| `list_files`, `read_file`, `search_text` | Assigned workspace, relative paths; no symlink traversal or excluded credential paths |
+| `write_file` | Competitor's copy only; disabled for attackers/judges |
+| `run_command` | Requires `--allow-exec`; Docker only, never a host shell |
+| `fetch_url` | Requires exact `arena.web_hosts`; HTTPS text with public IP pinning, no redirects |
+| Judge candidate-file tools | Read-only inspection of X/Y workspaces |
+
+Web fetch does not provide browser logins, screenshots, or JavaScript rendering. Arena does not reproduce every Claude Code feature or automatically connect MCP servers.
+
+### Execute and verify code
+
+Prepare a trusted Docker image containing your test dependencies before a run. Containers have no network and cannot install dependencies during the task.
 
 ```bash
-python3 -m unittest discover -s tests -v
+docker pull python:3.12-slim
 ```
 
-## The fine print
+Configure the existing `[arena]` section:
 
-**"100 versions of Claude" means 100 sub-agents of the model you are running.** Not 100 different
-models. What makes them different is the card. The dealer guarantees that no two agents get the
-same card, that every reasoning mode, workflow and strategy is dealt as evenly as possible, and that
-up to 144 agents, no two agents even share two of their three parts.
-
-**A competitor is its card plus its solution file.** Sub-agents do not remember anything between
-calls, so when competitor a017 attacks in round 3, that is a fresh sub-agent handed a017's card and
-a017's latest solution. 100 competitors, 595 calls.
-
-**"The best answer" means the one that survived every match.** The judges are Claude too, scoring
-against a written rubric that is in this repo for you to read and change. What you get is the
-strongest answer this tournament found, not a proof that it is right. That is why it shows you the
-attacks it survived, and why it tells you straight when the answer you rejected scored higher.
-
-**100 agents do not all run at the same moment.** Claude Code runs at most 10 tool calls at once by
-default (the `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` setting), so the arena runs in waves of 10. The
-spawn is 10 waves, the whole 100-agent run is 70, and it takes a while. If you raise that limit,
-pass `--wave` to match.
-
-**Expect permission prompts unless you allow edits.** Every sub-agent writes a file into `.arena/`,
-and in the default permission mode that is one approval per file. Run it in accept-edits mode
-(Shift+Tab).
-
-**Sub-agents cannot see your chat.** The skill writes a standalone task file, and that file is all
-100 agents ever know. If a requirement never made it into the file, all 100 miss it. It is at
-`.arena/<run>/task.md` if you want to check.
-
-**It never edits your project.** Code changes come back as a diff or as full files inside the
-winning answer. Applying them is your call, and the skill asks.
-
-**The same seed gives the same cards and the same bracket.** Not the same answers. The model is not
-deterministic.
-
-**It does not fix a bad task.** Vague task in, 100 flavours of vague out.
-
-## Files
-
-```
-skills/arena/SKILL.md          the orchestration steps and the exact brief every sub-agent gets
-skills/arena/bracket.py        the tournament state machine, standard library only
-skills/arena/strategies.json   15 reasoning modes, 12 workflows, 12 strategies. Edit freely
-skills/arena/rubric.md         the five criteria every judge scores on
-tests/test_bracket.py          the tests
+```toml
+[arena]
+agents = 4
+judge_votes = 2
+docker_image = "python:3.12-slim"
+verify_argv = ["python", "-m", "unittest", "discover", "-s", "tests"]
 ```
 
-## Credit
+Add `--allow-exec` to `arena run`. The configured verification command runs after each initial/revised candidate, independently of model claims. A known failed candidate cannot eliminate a known passed candidate; conflicting fatal findings pause the run. Zero exit status establishes only that the configured check passed: choose meaningful tests and inspect changes to test files.
 
-Made by Jake Schincariol, [opusjake.ai](https://opusjake.ai).
+Docker uses only the assigned workspace mount, disabled networking, dropped capabilities, no-new-privileges, a read-only root filesystem, process/memory/CPU limits, bounded retained output, and timeouts. No API-key environment variables or Docker socket are mounted. The workspace remains writable without a disk quota; this is not a VM or a guarantee against container escapes. Use a separate VM for workloads requiring stronger isolation.
 
-## License
+Snapshots omit `.git`, dependency environments, symlinks, `.env*`, common credential files/directories, and key files. Limits: 3000 files / 32 MiB per snapshot; 128 KiB per tool file read/write. Name filters cannot identify every secret: inspect your selected project first. Source/tool results may be sent to your configured providers, and run directories contain sensitive task/evidence data.
 
-MIT. Take it, change it, ship it.
+## Outputs
+
+| File / directory | Contents |
+| --- | --- |
+| `winner.md` | Winning revised answer |
+| `winner.patch` | Text diff against the filtered source snapshot; review before applying |
+| `report.json` | Winner, checks, review notes, baseline comparison, usage |
+| `workspaces/<agent>/` | Candidate files, including the winning workspace |
+| `jobs/`, `r0/`, `r1/`, ... | Checkpoints, solutions, attacks, defenses, judge votes |
+| `audit.jsonl`, `usage.json` | Model/tool evidence and request/token accounting |
+
+No external verification means `needs_review`. Failed winner verification, vote disagreement, or retained fatal findings also require review. `passed_configured_checks` refers only to your command and flagged conditions, not correctness. Binary changes need manual copying from the winning workspace. Text patches do not preserve binary data or file-mode changes.
+
+## Budgets and resume
+
+Default: four competitors, two parallel worker jobs, two judge votes per match: 22 base generation requests plus two preflight requests. Tools, repairs, fallback, and HTTP retries add requests. Use `arena plan` before spending.
+
+`max_calls` counts every HTTP attempt including retries and stops new requests at the limit. `max_total_tokens` tracks reported usage and reserves conservative in-flight allowances; missing usage and failed responses are charged estimates. Tokenization, provider billing, and ambiguous network failures prevent an exact monetary cap. Use provider-side spending controls for that.
+
+Provider failures, malformed/truncated output, or exhausted budgets pause instead of fabricating winners. Finished jobs/votes are checkpointed. A job interrupted before its receipt is durable can be repeated and billed again; its partially edited copy remains for inspection.
+
+```bash
+arena status --dir .arena/parser-fix
+arena resume --config arena.toml --dir .arena/parser-fix
+```
+
+Resume requires the original absolute run path, models/task/tools/verification settings. Budgets and concurrency may be changed explicitly. Source/task/rubric and completed-output hashes are checked. A lock rejects concurrent runners. If a killed process leaves `.run.lock`, confirm the process/container stopped before deleting it. CLI overrides such as `--agents` must be reflected in the resume config.
+
+## Development
+
+```bash
+python -m unittest discover -s tests -v
+python -m compileall -q arena
+python -m arena plan --config examples/groq.toml
+```
+
+Tests cover the original 100-competitor bracket, local HTTP wire fixtures for the API families, model doubles for tournaments/baseline/resume, real local file tools/patch applicability, and mocked Docker verification. They do not establish hosted-model answer quality or live Docker sandbox acceptance. No real API keys are needed for tests.
+
+The low-level bracket CLI remains at `python -m arena.bracket ...`. The standalone runner owns API calls, tools, stricter response validation, checkpoints, and evidence. Claude marketplace packaging and `SKILL.md` orchestration have been removed.
