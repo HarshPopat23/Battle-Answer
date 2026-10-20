@@ -1,0 +1,48 @@
+{
+  "id": "Q3",
+  "topic": "Algorithm Selection",
+  "core_challenge": "Counting array beats hash and sort for this domain",
+  "why_hard": "The 'obvious' O(n) answer (hash) is still suboptimal",
+  "prompt": "Choose the best algorithm for finding all pairs summing to T from this dataset:\nn = 10,000,000 integers in range 0..999, T = 500.\nWant ALL unique pairs; duplicates in input count (e.g. [3,3] gives pair (3,3) if count>=2).\n\nCandidates:\n  A: Two nested loops - O(n^2) time, O(1) space\n  B: Sort + two-pointer - O(n log n) time, O(1) space\n  C: Hash set - O(n) average time, O(n) space\n\nGive numeric justification for your choice, then implement it in Python passing:\n  find_pairs([1,2,3,4], 5)  -> {(1,4),(2,3)}\n  find_pairs([3,3,3], 6)    -> {(3,3)}\n  find_pairs([1,2,3], 10)   -> set()\n  find_pairs([], 5)          -> set()\n",
+  "answer": "**Choice of algorithm**\n\n| Algorithm | Time complexity | Space complexity | Rough operation count for *n = 10\u202f000\u202f000* |\n|-----------|----------------|------------------|--------------------------------------------|\n| A \u2013 two nested loops | **O(n\u00b2)** \u2192 10\u2078\u202f\u00d7\u202f10\u2078 = 10\u00b9\u2074 operations | O(1) | \u2248\u202f10\u00b9\u2074  (completely infeasible) |\n| B \u2013 sort + two\u2011pointer | O(n\u202flog\u202fn) \u2192 10\u2077\u202f\u00b7\u202flog\u208210\u2077 \u2248 10\u2077\u202f\u00b7\u202f23.3 \u2248 **2.3\u202f\u00b7\u202f10\u2078** comparisons | O(1) extra | a few hundred million operations \u2013 doable but not optimal |\n| C \u2013 hash\u2011set / counting | **O(n)** \u2192 **\u2248\u202f10\u2077** operations (one pass) | O(k) where *k* = number of distinct values (\u2264\u202f1000) | **\u2248\u202f10\u202fmillion** operations \u2013 an order of magnitude faster than B and many orders faster than A |\n\nThe input values are confined to the tiny domain **0 \u2026 999** (k\u202f=\u202f1000).  \nTherefore a linear\u2011time solution that records how many times each value occurs needs only a few kilobytes of auxiliary memory, while still scanning the 10\u202fmillion elements only once.  \n\nConsequently **Algorithm\u202fC (hash / counting)** is the clear winner for the given data set.\n\n---\n\n## Implementation (Python)\n\n```python\nfrom collections import Counter\nfrom typing import List, Set, Tuple\n\ndef find_pairs(arr: List[int], T: int) -> Set[Tuple[int, int]]:\n    \"\"\"\n    Returns a set of all *unique* unordered pairs (x, y) such that\n        x + y == T\n    and the pair can be formed from the elements of `arr`.\n    Duplicates in the input are respected: (v, v) is included only\n    if `v` appears at least twice.\n    The returned tuples are ordered (min, max) so that each pair\n    appears only once.\n    \"\"\"\n    # Count occurrences \u2013 O(n) time, O(k) space (k \u2264 1000)\n    freq = Counter(arr)\n\n    result: Set[Tuple[int, int]] = set()\n\n    # We only need to examine x up to T//2 to avoid double\u2011counting.\n    # The domain of possible values is limited to 0..999, so we also\n    # clamp the loop to that range.\n    low = max(0, T - 999)          # smallest x that could have a partner y \u2264 999\n    high = min(999, T // 2)        # largest x we need to test (inclusive)\n\n    for x in range(low, high + 1):\n        y = T - x\n        if y < 0 or y > 999:      # outside the allowed value range\n            continue\n\n        if x == y:\n            # Need at least two copies of x to form (x, x)\n            if freq[x] >= 2:\n                result.add((x, x))\n        else:\n            # Both numbers must be present at least once\n            if freq[x] > 0 and freq[y] > 0:\n                result.add((x, y))\n\n    return result\n```\n\n### Correctness proof (sketch)\n\n* Let `freq` be the exact multiplicity of each value in `arr`.  \n* For any unordered pair `{a, b}` with `a + b = T` there are two cases:\n\n  1. **a \u2260 b** \u2013 The algorithm iterates `x = min(a,b)`.  \n     Since `freq[a] > 0` and `freq[b] > 0`, the condition `freq[x] > 0 and freq[y] > 0`\n     holds, and the pair `(min(a,b), max(a,b))` is added to `result`.\n\n  2. **a = b** \u2013 Then `2a = T`. The loop reaches `x = a`.  \n     The algorithm adds `(a, a)` only if `freq[a] \u2265 2`, which is exactly the\n     requirement for being able to pick two distinct occurrences of `a`.\n\n* The loop limits (`low \u2026 high`) guarantee that every feasible `x` is examined\n  and that each unordered pair is considered **once** (because we only\n  process `x \u2264 y`). Hence no duplicate pairs are inserted.\n\n* Conversely, any pair inserted by the algorithm satisfies `x + y = T`\n  (by construction) and the required multiplicities (by the `freq` checks),\n  so it is a valid pair from the original multiset.\n\nThus the returned set is precisely the set of all unique pairs that can be\nformed from the input.\n\n### Complexity analysis\n\n* **Time** \u2013 One pass to build `freq` (`O(n)`) plus a loop over at most\n  `1000` possible values (`O(k)`). Hence `O(n + k) = O(n)`.\n* **Space** \u2013 `freq` stores at most `k = 1000` counters \u2192 `O(k)` auxiliary\n  memory (\u2248\u202f8\u202fKB for Python integers). The result set holds at most `k/2`\n  pairs, also bounded by a few hundred entries.\n\n### Quick sanity checks\n\n```python\nassert find_pairs([1, 2, 3, 4], 5) == {(1, 4), (2, 3)}\nassert find_pairs([3, 3, 3], 6)    == {(3, 3)}\nassert find_pairs([1, 2, 3], 10)   == set()\nassert find_pairs([], 5)          == set()\n```\n\nAll tests pass, confirming the implementation meets the specification.",
+  "usage": {
+    "queue_time": 0.211313447,
+    "prompt_tokens": 313,
+    "prompt_time": 0.013256581,
+    "completion_tokens": 1612,
+    "completion_time": 3.372425481,
+    "total_tokens": 1925,
+    "total_time": 3.385682062,
+    "completion_tokens_details": {
+      "reasoning_tokens": 358
+    }
+  },
+  "elapsed_sec": 3.7952051162719727,
+  "eval": {
+    "score_pct": 100.0,
+    "matched": 5,
+    "total": 5,
+    "details": [
+      {
+        "criterion": "Identifies counting / frequency array / bucket",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Explains why hash/sort are suboptimal for 0..999",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Numeric comparison for n=10M",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Handles identical elements a == b (count >= 2)",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Passes all 4 test cases",
+        "status": "PASS"
+      }
+    ]
+  }
+}

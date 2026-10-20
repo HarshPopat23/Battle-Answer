@@ -1,0 +1,48 @@
+{
+  "id": "Q10",
+  "topic": "XOR Three Uniques",
+  "core_challenge": "XOR partition with 2-singles-in-one-group case",
+  "why_hard": "Nearly all naive XOR attempts fail this edge case",
+  "prompt": "You have an array where every element appears exactly twice EXCEPT three elements\nthat each appear exactly once. Find all three in O(n) time and O(1) space.\nYou may NOT sort, use a hash map, or use more than O(1) extra integer variables.\n\nProve your algorithm is correct. Implement in Python. Pass all tests:\n  find_three([1,1,2,2,3,3,4,4,5,6,7]) -> {5,6,7}\n  find_three([1,2,3])                  -> {1,2,3}\n  find_three([0,0,1,1,2,3,4,2])        -> {3,4}   (wait: 3 and 4 appear once; check count)\n\nNote: XOR of all elements gives X^Y^Z. Extend the classic single-unique trick to three.\nShow your reasoning step by step, including how you handle the case where a bit partition\nputs 2 singles in one group.\n",
+  "answer": "**Solution Overview**\n\nFor an array `A`\n\n* every value occurs **exactly twice** except three values  \n  `x , y , z` that occur **once**,\n* we may use only a constant number of integer variables,\n* we may scan the array any number of times, but the total work must be `\u0398(n)`.\n\nThe classic trick for \u201cone single element\u201d uses the XOR\u2011operation because  \n\n```\na ^ a = 0                (pair cancels)\na ^ 0 = a                (identity)\n```\n\nIf we XOR the whole array we obtain  \n\n```\nX = x ^ y ^ z                (1)\n```\n\nThe difficulty is to split the three unknown numbers into groups that contain\n*exactly one* of them, because then a second XOR gives that element.\nThe following algorithm does that with at most **four linear scans** and\nonly a handful of integer variables.\n\n--------------------------------------------------------------------\n\n#### 1.  Notation  \n\n* `xor_all` \u2013 XOR of the whole array (`X` in (1)).\n* `lowbit(v)` \u2013 the lowest set bit of `v` (`v & -v` in two\u2019s complement).\n* `mask` \u2013 a bit mask used to partition the array.\n* `group_xor(mask)` \u2013 XOR of all elements whose binary representation has the\n  mask\u2011bit set.\n\n--------------------------------------------------------------------\n\n#### 2.  Finding **one** of the three singletons  \n\n```\nxor_all = XOR of all numbers                # first scan\nmask1   = lowbit(xor_all)                   # a bit that is set in an odd\n                                            # number of {x,y,z}\ng1      = group_xor(mask1)                  # second scan\n```\n\n`mask1` is set in either **one** of `{x,y,z}` or in **all three**,\nbecause the number of singletons that have the bit set must be odd\n(1 or 3).\n\n*If the bit belongs to only one singleton*  \n`g1` equals that singleton, because every duplicated value appears an even\nnumber of times in the same group and cancels out.\n\n*If the bit belongs to all three*  \nthen every singleton is in the same group, therefore  \n\n```\ng1 = x ^ y ^ z = xor_all                (2)\n```\n\nand we have not isolated a single value yet.\n\n--------------------------------------------------------------------\n**Detecting the two cases**\n\n```\nif g1 != xor_all:               # the bit is not common to all three\n        u1 = g1                # we already have one singleton\nelse:                           # mask1 is common to x, y and z\n        # remove that common bit from xor_all \u2013 now the remaining xor\n        # contains a bit that is set in exactly ONE of the three numbers\n        xor_without_common = xor_all ^ mask1          # clears that bit\n        mask2 = lowbit(xor_without_common)            # a bit set in 1 singleton\n        u1 = group_xor(mask2)                         # third scan \u2192 a singleton\n```\n\nWhy does the second branch work?\n\n*All three numbers have `mask1` set, therefore `xor",
+  "usage": {
+    "queue_time": 0.308789175,
+    "prompt_tokens": 315,
+    "prompt_time": 0.015765603,
+    "completion_tokens": 3500,
+    "completion_time": 7.402233386,
+    "total_tokens": 3815,
+    "total_time": 7.417998989,
+    "completion_tokens_details": {
+      "reasoning_tokens": 2831
+    }
+  },
+  "elapsed_sec": 23.108567714691162,
+  "eval": {
+    "score_pct": 60.0,
+    "matched": 3,
+    "total": 5,
+    "details": [
+      {
+        "criterion": "XOR all elements to get X ^ Y ^ Z",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Bit partitioning logic and bit selection",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Handling 2-singles in one group and 1 in other",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Correct handling/observation on test cases",
+        "status": "MISS"
+      },
+      {
+        "criterion": "Working Python implementation and proof",
+        "status": "MISS"
+      }
+    ]
+  }
+}

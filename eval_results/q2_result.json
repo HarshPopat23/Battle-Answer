@@ -1,0 +1,48 @@
+{
+  "id": "Q2",
+  "topic": "SQL Race Condition",
+  "core_challenge": "TOCTOU + deadlock in bank transfers",
+  "why_hard": "FOR SHARE looks correct but isn't sufficient",
+  "prompt": "A bank's transfer endpoint runs this SQL inside a READ COMMITTED transaction.\nIdentify every concurrency hazard, give a concrete scenario showing money being lost\nor doubled, then rewrite it (PostgreSQL dialect) to be fully safe. Raw SQL only, no ORM.\n\n-- Transfer $amount from account A to account B\nSELECT balance FROM accounts WHERE id = A FOR SHARE;\n-- application checks balance >= amount\nUPDATE accounts SET balance = balance - amount WHERE id = A;\nUPDATE accounts SET balance = balance + amount WHERE id = B;\n",
+  "answer": "**1.  Concurrency hazards in the original code**\n\n| Hazard | Why it appears with the shown statements (READ\u202fCOMMITTED) |\n|--------|------------------------------------------------------------|\n| **Lost\u2011update / write\u2011skew** | The `SELECT \u2026 FOR SHARE` only takes a *shared* lock. Two concurrent sessions can both read the same balance, both decide that the account has enough money, and both later execute the `UPDATE accounts SET balance = balance\u2011amount \u2026`. The net effect is that the source account can be over\u2011drawn (money \u201cdisappears\u201d) or the destination can receive the amount twice (money \u201cappears\u201d). |\n| **Non\u2011repeatable read** | After the `SELECT \u2026 FOR SHARE` another transaction may modify the same row (it needs an exclusive lock, which is compatible with a shared lock). The first transaction therefore works on a stale snapshot of the balance. |\n| **Lock\u2011upgrade dead\u2011lock** | `SELECT \u2026 FOR SHARE` acquires a *share* lock, then the same transaction later tries to `UPDATE` the same row, which requires an *exclusive* lock. PostgreSQL must upgrade the lock; if another session already holds a share lock, both sessions can end up waiting for each other \u2192 dead\u2011lock. |\n| **Partial\u2011transfer loss** | If the first `UPDATE` (debit) succeeds and the second `UPDATE` (credit) fails (e.g. network glitch, constraint violation on the destination row), the money is removed from the source but never added to the destination \u2013 the system has lost money. |\n| **Phantom\u2011like anomaly** | Because the two `UPDATE`s are independent, a third transaction could insert a new row with the same `id` (if `id` were not a primary key) between the two statements. In a properly designed schema `id` is PK, but the pattern is still unsafe for any future schema change. |\n\n---\n\n**2.  Concrete \u201cmoney\u2011lost / money\u2011doubled\u201d scenario**\n\nAssume the table `accounts(id PK, balance numeric)` and an initial state:\n\n| id | balance |\n|----|---------|\n| A  | 100     |\n| B  | 0       |\n| C  | 0       |\n\nTwo clients start two concurrent transfers, both **READ\u202fCOMMITTED** and both using the original code:\n\n*Transaction\u202fT1* \u2013 transfer **80** from **A** to **B**  \n*Transaction\u202fT2* \u2013 transfer **30** from **A** to **C**\n\n```\nT1: SELECT balance FROM accounts WHERE id = A FOR SHARE;   -- sees 100\nT2: SELECT balance FROM accounts WHERE id = A FOR SHARE;   -- also sees 100\n```\n\nBoth sessions think the balance is sufficient.\n\n```\nT1: UPDATE accounts SET balance = balance - 80 WHERE id = A;   -- A = 20\nT2: UPDATE accounts SET balance = balance - 30 WHERE id = A;   -- A = -10\n```\n\nNow the source account is **\u201110** (over\u2011drawn). The credit side runs:\n\n```\nT1: UPDATE accounts SET balance = balance + 80 WHERE id = B;   -- B = 80\nT2: UPDATE accounts SET balance = balance + 30 WHERE id = C;   -- C = 30\n```\n\n**Result:** total money in the system = 100 (A) + 80 (B) + 30 (C) = **210** \u2013 **110** units have been *created* out of thin air.  \nIf the second `UPDATE` (credit) had failed after the debit, the system would have *lost* the amount.\n\n---\n\n**3.  Fully safe implementation (PostgreSQL dialect)**  \n\nThe safe version must satisfy three properties:\n\n1. **Serialize the two rows** so that no other transaction can modify them while the transfer is in progress.  \n2. **Check the balance atomically** with the debit \u2013 the debit must only happen if the source has enough funds.  \n3. **Make the whole transfer a single logical unit** so that a failure after the debit automatically rolls back the credit.\n\nThe simplest, dead\u2011lock\u2011free pattern is:\n\n* always lock the rows in a deterministic order (e.g. `LEAST(idA,idB)`, `GREATEST(idA,idB)`);\n* perform the *balance\u2011check\u2011and\u2011debit* as a single `UPDATE \u2026 WHERE \u2026 RETURNING`;\n* only if the debit succeeded, credit the destination.\n\n```sql\n-- 1. start a transaction (client side must BEGIN \u2026 COMMIT/ROLLBACK)\nBEGIN;\n\n-- 2. lock the two rows in a stable order to avoid dead\u2011locks\n--    (FOR UPDATE obtains an exclusive row lock)\nSELECT 1\nFROM   accounts\nWHERE  id = LEAST(:src_id, :dst_id) FOR UPDATE;\nSELECT 1\nFROM   accounts\nWHERE  id = GREATEST(:src_id, :dst_id) FOR UPDATE;\n\n-- 3. atomic debit with balance check\nWITH debit AS (\n    UPDATE accounts\n       SET balance = balance - :amount\n     WHERE id = :src_id\n       AND balance >= :amount               -- <-- balance check\n     RETURNING balance\n)\n-- 4. only if the debit succeeded, credit the destination\nINSERT INTO accounts (id, balance)          -- this works even if the row is a PK\nSELECT :dst_id, :amount\nON CONFLICT (id) DO UPDATE\n   SET balance = accounts.balance + EXCLUDED.balance\nWHERE EXISTS (SELECT 1 FROM debit);        -- credit only when debit succeeded\n\n-- 5. verify that the debit really happened (otherwise raise an error)\nSELECT CASE\n         WHEN EXISTS (SELECT 1 FROM debit) THEN 'OK'\n         ELSE raise_exception('Insufficient funds')\n       END AS transfer_status;\n\nCOMMIT;\n```\n\n### Why this is safe\n\n| Step | Safety guarantee |\n|------|-------------------|\n| **Row\u2011level `FOR UPDATE`** (both rows) | Guarantees exclusive access to *both* accounts for the whole transaction. No other session can read or modify them until the transaction ends. |\n| **`UPDATE \u2026 WHERE balance >= :amount RETURNING`** | The debit is performed *only* when the source balance is sufficient; the check and the subtraction happen in the same row\u2011level lock, eliminating lost\u2011update/write\u2011skew. |\n| **`INSERT \u2026 ON CONFLICT \u2026 DO UPDATE`** (or a plain `UPDATE` if the row is guaranteed to exist) | Credits the destination in the same transaction. If the debit did not happen (`debit` CTE empty) the `WHERE EXISTS` prevents the credit, so no partial transfer can survive. |\n| **Deterministic lock order** (`LEAST`/`GREATEST`) | Prevents dead\u2011locks when many transfers run concurrently, because every transaction acquires the locks in the same order. |\n| **Read\u2011Committed + explicit row locks** | Even under the weakest isolation level the explicit `FOR UPDATE` makes the transaction behave as if it were `SERIALIZABLE` for the two rows involved. |\n\n---\n\n**4.  One\u2011statement alternative (still safe)**  \n\nIf you prefer a single `UPDATE` that touches both rows, you can use a `CASE` expression together with a balance guard:\n\n```sql\nBEGIN;\n\n-- lock rows in deterministic order\nSELECT 1 FROM accounts WHERE id = LEAST(:src_id, :dst_id) FOR UPDATE;\nSELECT 1 FROM accounts WHERE id = GREATEST(:src_id, :dst_id) FOR UPDATE;\n\n-- atomic transfer\nWITH transferred AS (\n    UPDATE accounts\n       SET balance = CASE\n                       WHEN id = :src_id THEN balance - :amount\n                       WHEN id = :dst_id THEN balance + :amount\n                     END\n     WHERE id IN (:src_id, :dst_id)\n       AND (id <> :src_id OR balance >= :amount)   -- guard on source row only\n     RETURNING id, balance\n)\nSELECT\n    CASE\n        WHEN (SELECT COUNT(*) FROM transferred) = 2\n        THEN 'OK'\n        ELSE raise_exception('Insufficient funds')\n    END AS transfer_status;\n\nCOMMIT;\n```\n\nThe `WHERE` clause guarantees that the update will succeed **only if** the source row satisfies `balance >= :amount`. If the guard fails, **no row** is updated (the `RETURNING` set is empty) and the transaction can abort with an error, leaving both accounts untouched.\n\nBoth versions are fully safe against the concurrency hazards identified above, work under PostgreSQL\u2019s default `READ COMMITTED` isolation level, and require no ORM\u2011level magic \u2013 just plain, verified SQL.",
+  "usage": {
+    "queue_time": 0.338049136,
+    "prompt_tokens": 206,
+    "prompt_time": 0.008805875,
+    "completion_tokens": 2642,
+    "completion_time": 5.559720867,
+    "total_tokens": 2848,
+    "total_time": 5.5685267419999995,
+    "completion_tokens_details": {
+      "reasoning_tokens": 794
+    }
+  },
+  "elapsed_sec": 6.122159719467163,
+  "eval": {
+    "score_pct": 100.0,
+    "matched": 5,
+    "total": 5,
+    "details": [
+      {
+        "criterion": "TOCTOU / Non-exclusive lock race",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Concrete loss/overdraw scenario",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Deadlock hazard (A->B vs B->A)",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Safe rewrite: FOR UPDATE or conditional UPDATE",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Deadlock prevention via ordering",
+        "status": "PASS"
+      }
+    ]
+  }
+}
