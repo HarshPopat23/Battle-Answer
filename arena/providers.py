@@ -89,7 +89,19 @@ class Client:
                 return self.decode(json.loads(content))
             except error.HTTPError as exc:
                 status = exc.code
-                retry_after = exc.headers.get("Retry-After")
+                retry_after = exc.headers.get("Retry-After") or exc.headers.get("retry-after")
+                reset_tokens = exc.headers.get("x-ratelimit-reset-tokens") or exc.headers.get("x-ratelimit-reset-requests")
+                if not retry_after and reset_tokens:
+                    try:
+                        s = str(reset_tokens).strip()
+                        if s.endswith("ms"):
+                            retry_after = float(s[:-2]) / 1000.0 + 0.5
+                        elif s.endswith("s"):
+                            retry_after = float(s[:-1]) + 0.5
+                        elif s.endswith("m"):
+                            retry_after = float(s[:-1]) * 60.0 + 0.5
+                    except Exception:
+                        pass
                 exc.close()
                 if status not in (429, 500, 502, 503, 504) or attempt == self.model.retries:
                     # Do not echo provider bodies/URLs that may contain secrets or task data.
@@ -100,9 +112,9 @@ class Client:
             except (json.JSONDecodeError, UnicodeDecodeError, KeyError, IndexError, TypeError, AttributeError):
                 raise ProviderError(f"{self.model.provider} returned an invalid or unsupported response shape.") from None
             try:
-                delay = min(30, max(0, float(retry_after))) if retry_after else min(8, 2 ** attempt)
-            except ValueError:
-                delay = min(8, 2 ** attempt)
+                delay = min(60, max(1.0, float(retry_after))) if retry_after else min(20, 2 ** (attempt + 1) + 2)
+            except (ValueError, TypeError):
+                delay = min(20, 2 ** (attempt + 1) + 2)
             time.sleep(delay)
         raise ProviderError("Provider retry limit reached.")
 
